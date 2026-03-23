@@ -107,19 +107,3 @@ Multi-user family medicine tracking
 👩‍💻 Author
 Mannuru Sruthi
 ScanMyPills Project
-
-📌 Notes
-Ensure MySQL server is running before starting the backend
-
-Do not upload .env, venv, or database files to GitHub
-
-Use app passwords for email configuration (Gmail recommended)
-
-🔥 PRO TIP
-After adding this:
-👉 Save as README.md in your backend folder
-👉 Then run:
-
-git add README.md
-git commit -m "Added README"
-git push
