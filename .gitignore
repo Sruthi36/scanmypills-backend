@@ -4,21 +4,3 @@ __pycache__/
 
 # Virtual environment
 venv/
-env/
-
-# Environment variables (VERY IMPORTANT)
-.env
-
-# Uploads (user images)
-uploads/
-
-# Database files
-*.db
-
-# Logs & test files
-*.log
-*.txt
-
-# OS files
-.DS_Store
-Thumbs.db
