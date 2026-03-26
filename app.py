@@ -25,21 +25,22 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-#print("UPLOAD FOLDER PATH:", UPLOAD_FOLDER)
+# Allowed file types
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+# 🔴 IMPORTANT: Replace with your deployed URL
+BASE_URL = "https://180.235.121.253:8115.onrender.com"
 
 def allowed_file(filename):
-    return '.' in filename and \
-        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 from flask import send_from_directory
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
 
 # --- Database Configuration ---
 # Update these values or set environment variables according to your local MySQL setup.
@@ -1051,54 +1052,64 @@ def process_medicine():
 @token_required
 def save_medicine(user_id):
 
-    data = request.get_json()
-
-    if not data:
-        return jsonify({"error": "Invalid JSON body"}), 400
-
     conn = None
     cursor = None
 
     try:
-        name = data.get("name")
-        manufacturer = data.get("manufacturer")
-        expiry_date = data.get("expiry_date")
-        batch_number = data.get("batch_number")
-        mrp = data.get("mrp")
-        dosage = data.get("dosage")
-        category = data.get("category")
-        quantity = data.get("quantity")
+        # ✅ Get form data (NOT JSON)
+        name = request.form.get("name")
+        manufacturer = request.form.get("manufacturer")
+        expiry_date = request.form.get("expiry_date")
+        batch_number = request.form.get("batch_number")
+        mrp = request.form.get("mrp")
+        dosage = request.form.get("dosage")
+        category = request.form.get("category")
+        quantity = request.form.get("quantity")
 
-        front_image = data.get("front_image")
-        back_image = data.get("back_image")
-        main_image = data.get("main_image")
+        # ✅ Get image files
+        front_file = request.files.get("front_image")
+        back_file = request.files.get("back_image")
+        main_file = request.files.get("main_image")
 
         if not name:
             return jsonify({"error": "Medicine name is required"}), 400
 
-        conn = get_db_connection()
+        # ✅ Function to save file safely
+        def save_file(file):
+            if file and allowed_file(file.filename):
+                unique_name = str(uuid.uuid4()) + "_" + file.filename
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+                file.save(filepath)
 
+                # Return FULL URL (IMPORTANT)
+                return f"{BASE_URL}/uploads/{unique_name}"
+            return None
+
+        # ✅ Save images
+        front_image = save_file(front_file)
+        back_image = save_file(back_file)
+        main_image = save_file(main_file)
+
+        # DB connection
+        conn = get_db_connection()
         if conn is None:
             return jsonify({"error": "Database connection failed"}), 500
 
         cursor = conn.cursor(dictionary=True)
 
-        # 🔎 Check if medicine already exists for this user
+        # 🔎 Check duplicate
         check_query = """
         SELECT id FROM medicines
         WHERE user_id = %s AND name = %s AND batch_number = %s
         LIMIT 1
         """
-
         cursor.execute(check_query, (user_id, name, batch_number))
         existing = cursor.fetchone()
 
         if existing:
-            return jsonify({
-                "error": "This medicine is already saved"
-            }), 409
+            return jsonify({"error": "This medicine is already saved"}), 409
 
-        # Insert medicine
+        # ✅ Insert data
         insert_query = """
         INSERT INTO medicines
         (user_id, name, manufacturer, expiry_date, batch_number, mrp,
@@ -1123,39 +1134,30 @@ def save_medicine(user_id):
 
         conn.commit()
 
-        medicine_id = cursor.lastrowid
-
         return jsonify({
             "success": True,
-            "message": "Medicine saved successfully",
-            "medicine_id": medicine_id
+            "message": "Medicine saved successfully"
         }), 201
 
     except mysql.connector.Error as err:
-
         if conn:
             conn.rollback()
-
         return jsonify({
             "error": "Database error",
             "details": str(err)
         }), 500
 
     except Exception as e:
-
         if conn:
             conn.rollback()
-
         return jsonify({
             "error": "Server error",
             "details": str(e)
         }), 500
 
     finally:
-
         if cursor:
             cursor.close()
-
         if conn:
             conn.close()
 
